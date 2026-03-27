@@ -22,6 +22,8 @@ if "transacao_id" not in st.session_state:
     st.session_state.transacao_id = int(time.time())
 if "usuario_logado" not in st.session_state:
     st.session_state["usuario_logado"] = ""
+if "nome_logado" not in st.session_state:
+    st.session_state["nome_logado"] = ""
 
 st.markdown("""
     <style>
@@ -62,6 +64,9 @@ st.markdown("""
     
     h1, h2, h3, h4 { color: #1E1E1E; font-weight: 700; }
     hr { border-color: #EAEAEA; }
+    
+    /* Login Box Reformulada */
+    .login-box { background-color: white; padding: 40px; border-radius: 15px; box-shadow: 0 10px 25px rgba(0,0,0,0.05); text-align: center; }
     </style>
 """, unsafe_allow_html=True)
 
@@ -86,7 +91,7 @@ except Exception as e:
     st.stop()
 
 # ==========================================
-# 🛑 TELA DE LOGIN DINÂMICA (Design Lado a Lado)
+# 🛑 TELA DE LOGIN DINÂMICA
 # ==========================================
 if not st.session_state["autenticado"]:
     
@@ -125,6 +130,13 @@ if not st.session_state["autenticado"]:
                             if not match.empty:
                                 st.session_state["autenticado"] = True
                                 st.session_state["usuario_logado"] = usuario_input.strip()
+                                
+                                # NOVIDADE: Puxa o nome real da pessoa se a coluna 'Nome' existir!
+                                if 'Nome' in df_usuarios.columns:
+                                    st.session_state["nome_logado"] = str(match['Nome'].values[0]).strip()
+                                else:
+                                    st.session_state["nome_logado"] = usuario_input.strip()
+                                    
                                 st.rerun() 
                             else:
                                 st.error("❌ Usuário ou senha incorretos!")
@@ -161,7 +173,9 @@ with st.sidebar:
         
     st.markdown("<br>", unsafe_allow_html=True)
     
-    st.success(f"👤 Olá, **{st.session_state['usuario_logado']}**!")
+    # NOVIDADE: Saudação com o Nome Real!
+    nome_exibicao = st.session_state.get('nome_logado', st.session_state.get('usuario_logado', ''))
+    st.success(f"👤 Olá, **{nome_exibicao}**!")
     
     opcoes_menu = ["📊 Dashboard", "🛒 Frente de Caixa", "👥 Clientes", "💸 Despesas", "🍔 Produtos", "🍅 Insumos"]
     menu_selecionado = st.radio("", opcoes_menu, label_visibility="collapsed")
@@ -171,10 +185,11 @@ with st.sidebar:
     if st.button("🚪 Sair (Logout)", use_container_width=True):
         st.session_state["autenticado"] = False
         st.session_state["usuario_logado"] = ""
+        st.session_state["nome_logado"] = ""
         st.rerun()
         
     st.markdown("<br>", unsafe_allow_html=True)
-    st.caption("Sistema de Gestão Cloud v1.2")
+    st.caption("Sistema de Gestão Cloud v1.3")
 
 # -------------------------------------------------------------
 # MÓDULO 4: DASHBOARD 
