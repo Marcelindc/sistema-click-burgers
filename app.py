@@ -62,9 +62,6 @@ st.markdown("""
     
     h1, h2, h3, h4 { color: #1E1E1E; font-weight: 700; }
     hr { border-color: #EAEAEA; }
-    
-    /* Login Box Reformulada */
-    .login-box { background-color: white; padding: 40px; border-radius: 15px; box-shadow: 0 10px 25px rgba(0,0,0,0.05); text-align: center; }
     </style>
 """, unsafe_allow_html=True)
 
@@ -93,24 +90,19 @@ except Exception as e:
 # ==========================================
 if not st.session_state["autenticado"]:
     
-    # Adiciona um pequeno espaço no topo para centralizar melhor a tela
     st.markdown("<br><br>", unsafe_allow_html=True)
     
-    # Cria colunas: Espaço Vazio | Logo | Formulário | Espaço Vazio
     col_esq, col_logo, col_form, col_dir = st.columns([1, 1.5, 2, 1])
     
     with col_logo:
-        st.markdown("<br>", unsafe_allow_html=True) # Alinha a logo com a caixa
+        st.markdown("<br>", unsafe_allow_html=True) 
         try:
-            # Usa 100% do espaço da coluna para a logo ficar grandona e bonita
             st.image("LOGOCLICKVERMELHA.png", use_container_width=True)
         except:
             st.warning("⚠️ Imagem da logo não encontrada no GitHub.")
             
     with col_form:
-        st.markdown('<div class="login-box">', unsafe_allow_html=True)
         st.markdown("### 🔒 Acesso Restrito")
-        st.markdown("<br>", unsafe_allow_html=True)
         
         with st.form("login_form"):
             usuario_input = st.text_input("Usuário", placeholder="Digite seu usuário")
@@ -140,8 +132,6 @@ if not st.session_state["autenticado"]:
                         st.error(f"Erro ao verificar usuários na planilha: {e}")
                 else:
                     st.warning("Preencha os campos de usuário e senha.")
-                    
-        st.markdown('</div>', unsafe_allow_html=True)
     
     st.stop() 
 
@@ -184,7 +174,7 @@ with st.sidebar:
         st.rerun()
         
     st.markdown("<br>", unsafe_allow_html=True)
-    st.caption("Sistema de Gestão Cloud v1.1")
+    st.caption("Sistema de Gestão Cloud v1.2")
 
 # -------------------------------------------------------------
 # MÓDULO 4: DASHBOARD 
