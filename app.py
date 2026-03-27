@@ -31,6 +31,9 @@ st.markdown("""
     [data-testid="stSidebar"] { background-color: #FFFFFF; border-right: 1px solid #EAEAEA; }
     div[data-testid="metric-container"] { display: none !important; }
     
+    /* REMOVE O ESPAÇO EM BRANCO NO TOPO */
+    .block-container { padding-top: 3rem !important; padding-bottom: 1rem !important; }
+    
     /* MENU LATERAL SEGURO */
     div[data-testid="stRadio"] div[role="radiogroup"] label { padding: 10px 15px !important; border-radius: 8px !important; margin-bottom: 5px !important; transition: all 0.2s ease !important; border: 1px solid transparent; }
     div[data-testid="stRadio"] div[role="radiogroup"] label:hover { background-color: #F4F6F9 !important; }
@@ -60,15 +63,14 @@ st.markdown("""
     h1, h2, h3, h4 { color: #1E1E1E; font-weight: 700; }
     hr { border-color: #EAEAEA; }
     
-    /* Login Box */
-    .login-box { background-color: white; padding: 40px; border-radius: 15px; box-shadow: 0 10px 25px rgba(0,0,0,0.05); text-align: center; margin-top: 50px; }
+    /* Login Box Reformulada */
+    .login-box { background-color: white; padding: 40px; border-radius: 15px; box-shadow: 0 10px 25px rgba(0,0,0,0.05); text-align: center; }
     </style>
 """, unsafe_allow_html=True)
 
 @st.cache_resource 
 def conectar_planilha():
     escopos = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
-    # Aqui o sistema puxa a chave secreta da nuvem!
     credenciais_dict = dict(st.secrets["gcp_service_account"])
     credenciais = ServiceAccountCredentials.from_json_keyfile_dict(credenciais_dict, escopos)
     cliente = gspread.authorize(credenciais)
@@ -87,18 +89,26 @@ except Exception as e:
     st.stop()
 
 # ==========================================
-# 🛑 TELA DE LOGIN DINÂMICA (Puxa da Planilha)
+# 🛑 TELA DE LOGIN DINÂMICA (Design Lado a Lado)
 # ==========================================
 if not st.session_state["autenticado"]:
-    col1, col2, col3 = st.columns([1, 1.5, 1])
-    with col2:
-        st.markdown('<div class="login-box">', unsafe_allow_html=True)
-        # LOGO CORRIGIDA PARA A NUVEM!
+    
+    # Adiciona um pequeno espaço no topo para centralizar melhor a tela
+    st.markdown("<br><br>", unsafe_allow_html=True)
+    
+    # Cria colunas: Espaço Vazio | Logo | Formulário | Espaço Vazio
+    col_esq, col_logo, col_form, col_dir = st.columns([1, 1.5, 2, 1])
+    
+    with col_logo:
+        st.markdown("<br>", unsafe_allow_html=True) # Alinha a logo com a caixa
         try:
-            st.image("LOGOCLICKVERMELHA.png", width=180)
+            # Usa 100% do espaço da coluna para a logo ficar grandona e bonita
+            st.image("LOGOCLICKVERMELHA.png", use_container_width=True)
         except:
             st.warning("⚠️ Imagem da logo não encontrada no GitHub.")
             
+    with col_form:
+        st.markdown('<div class="login-box">', unsafe_allow_html=True)
         st.markdown("### 🔒 Acesso Restrito")
         st.markdown("<br>", unsafe_allow_html=True)
         
@@ -154,7 +164,6 @@ def processar_imagem(uploaded_file, tamanho=(250, 250), qualidade=70):
 # MENU LATERAL 
 # -------------------------------------------------------------
 with st.sidebar:
-    # LOGO CORRIGIDA PARA A NUVEM!
     try:
         st.image("LOGOCLICKVERMELHA.png", width=140)
     except:
@@ -175,7 +184,7 @@ with st.sidebar:
         st.rerun()
         
     st.markdown("<br>", unsafe_allow_html=True)
-    st.caption("Sistema de Gestão Cloud v1.0")
+    st.caption("Sistema de Gestão Cloud v1.1")
 
 # -------------------------------------------------------------
 # MÓDULO 4: DASHBOARD 
