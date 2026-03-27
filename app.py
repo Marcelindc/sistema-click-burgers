@@ -68,7 +68,7 @@ st.markdown("""
 @st.cache_resource 
 def conectar_planilha():
     escopos = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
-    # NOVIDADE: Agora o sistema lê o "Cofre" de segurança da nuvem!
+    # Aqui o sistema puxa a chave secreta da nuvem!
     credenciais_dict = dict(st.secrets["gcp_service_account"])
     credenciais = ServiceAccountCredentials.from_json_keyfile_dict(credenciais_dict, escopos)
     cliente = gspread.authorize(credenciais)
@@ -81,9 +81,9 @@ try:
     aba_vendas = planilha.worksheet("Vendas")
     aba_despesas = planilha.worksheet("Despesas")
     aba_clientes = planilha.worksheet("Clientes") 
-    aba_usuarios = planilha.worksheet("Usuarios") # A NOVA ABA DE USUÁRIOS!
+    aba_usuarios = planilha.worksheet("Usuarios") 
 except Exception as e:
-    st.error(f"Erro na planilha. Crie a aba 'Usuarios' com as colunas Usuario e Senha. Detalhe: {e}")
+    st.error(f"Erro na planilha. Verifique as abas. Detalhe: {e}")
     st.stop()
 
 # ==========================================
@@ -93,7 +93,12 @@ if not st.session_state["autenticado"]:
     col1, col2, col3 = st.columns([1, 1.5, 1])
     with col2:
         st.markdown('<div class="login-box">', unsafe_allow_html=True)
-        st.image("/content/LOGOCLICKVERMELHA.png", width=180)
+        # LOGO CORRIGIDA PARA A NUVEM!
+        try:
+            st.image("LOGOCLICKVERMELHA.png", width=180)
+        except:
+            st.warning("⚠️ Imagem da logo não encontrada no GitHub.")
+            
         st.markdown("### 🔒 Acesso Restrito")
         st.markdown("<br>", unsafe_allow_html=True)
         
@@ -106,23 +111,19 @@ if not st.session_state["autenticado"]:
             if submit_login:
                 if usuario_input and senha_input:
                     try:
-                        # Baixa a lista de usuários APENAS quando clica em entrar (Economiza API)
                         df_usuarios = pd.DataFrame(aba_usuarios.get_all_records(value_render_option='UNFORMATTED_VALUE'))
-                        
                         if df_usuarios.empty:
                             st.error("❌ Nenhum usuário cadastrado na planilha!")
                         else:
-                            # Converte para texto puro para evitar erros de números (ex: senha '123')
                             df_usuarios['Usuario'] = df_usuarios['Usuario'].astype(str).str.strip()
                             df_usuarios['Senha'] = df_usuarios['Senha'].astype(str).str.strip()
                             
-                            # Procura se existe a combinação exata
                             match = df_usuarios[(df_usuarios['Usuario'] == usuario_input.strip()) & (df_usuarios['Senha'] == senha_input.strip())]
                             
                             if not match.empty:
                                 st.session_state["autenticado"] = True
                                 st.session_state["usuario_logado"] = usuario_input.strip()
-                                st.rerun() # Recarrega a página liberando o sistema
+                                st.rerun() 
                             else:
                                 st.error("❌ Usuário ou senha incorretos!")
                     except Exception as e:
@@ -132,7 +133,7 @@ if not st.session_state["autenticado"]:
                     
         st.markdown('</div>', unsafe_allow_html=True)
     
-    st.stop() # PARA A EXECUÇÃO DO CÓDIGO AQUI SE NÃO ESTIVER LOGADO!
+    st.stop() 
 
 # ==========================================
 # CÓDIGO DO SISTEMA (Só roda se logado)
@@ -153,7 +154,12 @@ def processar_imagem(uploaded_file, tamanho=(250, 250), qualidade=70):
 # MENU LATERAL 
 # -------------------------------------------------------------
 with st.sidebar:
-    st.image("/content/LOGOCLICKVERMELHA.png", width=140)
+    # LOGO CORRIGIDA PARA A NUVEM!
+    try:
+        st.image("LOGOCLICKVERMELHA.png", width=140)
+    except:
+        pass
+        
     st.markdown("<br>", unsafe_allow_html=True)
     
     st.success(f"👤 Olá, **{st.session_state['usuario_logado']}**!")
@@ -163,14 +169,13 @@ with st.sidebar:
     
     st.markdown("---")
     
-    # BOTÃO DE SAIR (LOGOUT)
     if st.button("🚪 Sair (Logout)", use_container_width=True):
         st.session_state["autenticado"] = False
         st.session_state["usuario_logado"] = ""
         st.rerun()
         
     st.markdown("<br>", unsafe_allow_html=True)
-    st.caption("Sistema de Gestão v8.1 - Admin Center")
+    st.caption("Sistema de Gestão Cloud v1.0")
 
 # -------------------------------------------------------------
 # MÓDULO 4: DASHBOARD 
