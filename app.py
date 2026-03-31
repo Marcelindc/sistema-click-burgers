@@ -151,7 +151,7 @@ with st.sidebar:
         st.rerun()
         
     st.markdown("<br>", unsafe_allow_html=True)
-    st.caption("Sistema Cloud v2.0 - PRO (Supabase)")
+    st.caption("Sistema Cloud v2.1 - PRO (Supabase)")
 
 # -------------------------------------------------------------
 # MÓDULO 4: DASHBOARD 
@@ -335,13 +335,16 @@ if menu_selecionado == "📊 Dashboard":
 # -------------------------------------------------------------
 elif menu_selecionado == "👥 Clientes":
     st.title("👥 Gestão de Clientes e CRM")
+    
     col_c1, col_c2 = st.columns([2, 1])
+    
     with col_c1:
         st.markdown("#### ➕ Cadastrar Novo Cliente")
         with st.form("form_cliente", clear_on_submit=True):
             nome_cli = st.text_input("Nome Completo")
             tel_cli = st.text_input("Telefone / WhatsApp (Ex: 11999998888)")
             nasc_cli = st.date_input("Data de Nascimento (Opcional)", value=None, min_value=datetime.date(1920, 1, 1))
+            
             if st.form_submit_button("Salvar Cliente"):
                 if nome_cli:
                     nasc_str = nasc_cli.strftime('%d/%m/%Y') if nasc_cli else ""
@@ -349,11 +352,57 @@ elif menu_selecionado == "👥 Clientes":
                     supabase.table("Clientes").insert({"Nome": nome_cli, "Telefone": tel_cli, "Data de Nascimento": nasc_str}).execute()
                     puxar_dados.clear()
                     st.success(f"✅ Cliente {nome_cli} cadastrado!")
-                else: st.error("O Nome é obrigatório!")
+                    time.sleep(1)
+                    st.rerun()
+                else: 
+                    st.error("O Nome é obrigatório!")
+
+        st.divider()
+
+        # NOVIDADE: SESSÃO DE EDITAR CLIENTES!
+        st.markdown("#### ✏️ Editar Cliente")
+        df_clientes_edit = puxar_dados('Clientes')
+        
+        if not df_clientes_edit.empty:
+            cliente_selecionado = st.selectbox("Selecione o Cliente para editar:", ["-- Escolha --"] + df_clientes_edit['Nome'].tolist())
+            
+            if cliente_selecionado != "-- Escolha --":
+                dados_atuais_c = df_clientes_edit[df_clientes_edit['Nome'] == cliente_selecionado].iloc[0]
+
+                # Tenta puxar a data de nascimento se o cliente já tiver uma cadastrada
+                try:
+                    data_nasc_atual = datetime.datetime.strptime(str(dados_atuais_c.get('Data de Nascimento', '')), '%d/%m/%Y').date()
+                except:
+                    data_nasc_atual = None
+
+                with st.form("form_editar_cliente"):
+                    edit_nome_c = st.text_input("Nome", value=str(dados_atuais_c['Nome']))
+                    edit_tel_c = st.text_input("Telefone", value=str(dados_atuais_c.get('Telefone', '')))
+                    edit_nasc_c = st.date_input("Data de Nascimento", value=data_nasc_atual, min_value=datetime.date(1920, 1, 1))
+
+                    if st.form_submit_button("Atualizar Cliente"):
+                        nasc_str_edit = edit_nasc_c.strftime('%d/%m/%Y') if edit_nasc_c else ""
+
+                        supabase.table("Clientes").update({
+                            "Nome": edit_nome_c,
+                            "Telefone": edit_tel_c,
+                            "Data de Nascimento": nasc_str_edit
+                        }).eq("id", int(dados_atuais_c['id'])).execute()
+
+                        puxar_dados.clear()
+                        st.success("✅ Cliente atualizado com sucesso!")
+                        time.sleep(1)
+                        st.rerun()
+
+        st.divider()
+
         st.markdown("#### Lista de Clientes")
         df_clientes = puxar_dados('Clientes')
-        if not df_clientes.empty: st.dataframe(df_clientes, use_container_width=True, hide_index=True)
-        else: st.info("Nenhum cliente cadastrado ainda.")
+        if not df_clientes.empty: 
+            st.dataframe(df_clientes, use_container_width=True, hide_index=True)
+        else: 
+            st.info("Nenhum cliente cadastrado ainda.")
+
     with col_c2:
         st.markdown("#### 🎉 Aniversariantes do Mês")
         if not df_clientes.empty and 'Data de Nascimento' in df_clientes.columns:
@@ -613,7 +662,6 @@ elif menu_selecionado == "🍅 Insumos":
                             try:
                                 receita = json.loads(str(row_prod['Receita']))
                                 if insumo_selecionado in receita or edit_nome in receita:
-                                    # Puxa atualizado
                                     df_insumos_atualizado = pd.DataFrame(supabase.table("Insumos").select("*").execute().data)
                                     novo_custo_total = sum([float(df_insumos_atualizado[df_insumos_atualizado['Nome do Insumo'] == n]['Custo por Porção'].values[0]) * q for n, q in receita.items()])
                                     val_desc_recalc = float(row_prod.get('Desconto', 0) if row_prod.get('Desconto', 0) != '' and pd.notna(row_prod.get('Desconto')) else 0.0)
