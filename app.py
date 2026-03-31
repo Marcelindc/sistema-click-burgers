@@ -139,7 +139,8 @@ with st.sidebar:
     nome_exibicao = st.session_state.get('nome_logado', st.session_state.get('usuario_logado', ''))
     st.success(f"👤 Olá, **{nome_exibicao}**!")
     
-    opcoes_menu = ["📊 Dashboard", "🛒 Frente de Caixa", "👥 Clientes", "💸 Despesas", "🍔 Produtos", "🍅 Insumos"]
+    # Módulos do Sistema
+    opcoes_menu = ["📊 Dashboard", "🛒 Frente de Caixa", "👥 Clientes", "💸 Despesas", "🍔 Produtos", "🍅 Insumos", "📝 Lista de Compras"]
     menu_selecionado = st.radio("", opcoes_menu, label_visibility="collapsed")
     st.markdown("---")
     
@@ -151,10 +152,10 @@ with st.sidebar:
         st.rerun()
         
     st.markdown("<br>", unsafe_allow_html=True)
-    st.caption("Sistema Cloud v2.1 - PRO (Supabase)")
+    st.caption("Sistema Cloud v3.0 - Click Burgers")
 
 # -------------------------------------------------------------
-# MÓDULO 4: DASHBOARD 
+# MÓDULO 1: DASHBOARD 
 # -------------------------------------------------------------
 if menu_selecionado == "📊 Dashboard":
     st.title("Visão Estratégica")
@@ -331,11 +332,10 @@ if menu_selecionado == "📊 Dashboard":
                 else: st.info("Sem pagamentos registrados.")
 
 # -------------------------------------------------------------
-# MÓDULOS DE CADASTROS E LANÇAMENTOS (INTEGRADO AO SUPABASE)
+# MÓDULO 2: CLIENTES E CRM
 # -------------------------------------------------------------
 elif menu_selecionado == "👥 Clientes":
     st.title("👥 Gestão de Clientes e CRM")
-    
     col_c1, col_c2 = st.columns([2, 1])
     
     with col_c1:
@@ -348,18 +348,15 @@ elif menu_selecionado == "👥 Clientes":
             if st.form_submit_button("Salvar Cliente"):
                 if nome_cli:
                     nasc_str = nasc_cli.strftime('%d/%m/%Y') if nasc_cli else ""
-                    # SALVA NO SUPABASE
                     supabase.table("Clientes").insert({"Nome": nome_cli, "Telefone": tel_cli, "Data de Nascimento": nasc_str}).execute()
                     puxar_dados.clear()
                     st.success(f"✅ Cliente {nome_cli} cadastrado!")
                     time.sleep(1)
                     st.rerun()
-                else: 
-                    st.error("O Nome é obrigatório!")
+                else: st.error("O Nome é obrigatório!")
 
         st.divider()
 
-        # NOVIDADE: SESSÃO DE EDITAR CLIENTES!
         st.markdown("#### ✏️ Editar Cliente")
         df_clientes_edit = puxar_dados('Clientes')
         
@@ -368,12 +365,8 @@ elif menu_selecionado == "👥 Clientes":
             
             if cliente_selecionado != "-- Escolha --":
                 dados_atuais_c = df_clientes_edit[df_clientes_edit['Nome'] == cliente_selecionado].iloc[0]
-
-                # Tenta puxar a data de nascimento se o cliente já tiver uma cadastrada
-                try:
-                    data_nasc_atual = datetime.datetime.strptime(str(dados_atuais_c.get('Data de Nascimento', '')), '%d/%m/%Y').date()
-                except:
-                    data_nasc_atual = None
+                try: data_nasc_atual = datetime.datetime.strptime(str(dados_atuais_c.get('Data de Nascimento', '')), '%d/%m/%Y').date()
+                except: data_nasc_atual = None
 
                 with st.form("form_editar_cliente"):
                     edit_nome_c = st.text_input("Nome", value=str(dados_atuais_c['Nome']))
@@ -382,11 +375,8 @@ elif menu_selecionado == "👥 Clientes":
 
                     if st.form_submit_button("Atualizar Cliente"):
                         nasc_str_edit = edit_nasc_c.strftime('%d/%m/%Y') if edit_nasc_c else ""
-
                         supabase.table("Clientes").update({
-                            "Nome": edit_nome_c,
-                            "Telefone": edit_tel_c,
-                            "Data de Nascimento": nasc_str_edit
+                            "Nome": edit_nome_c, "Telefone": edit_tel_c, "Data de Nascimento": nasc_str_edit
                         }).eq("id", int(dados_atuais_c['id'])).execute()
 
                         puxar_dados.clear()
@@ -395,13 +385,10 @@ elif menu_selecionado == "👥 Clientes":
                         st.rerun()
 
         st.divider()
-
         st.markdown("#### Lista de Clientes")
         df_clientes = puxar_dados('Clientes')
-        if not df_clientes.empty: 
-            st.dataframe(df_clientes, use_container_width=True, hide_index=True)
-        else: 
-            st.info("Nenhum cliente cadastrado ainda.")
+        if not df_clientes.empty: st.dataframe(df_clientes, use_container_width=True, hide_index=True)
+        else: st.info("Nenhum cliente cadastrado ainda.")
 
     with col_c2:
         st.markdown("#### 🎉 Aniversariantes do Mês")
@@ -424,6 +411,9 @@ elif menu_selecionado == "👥 Clientes":
                         if aniv['Whats']: st.markdown(f"📱 {aniv['Whats']}")
             else: st.info("Nenhum cliente faz aniversário este mês.")
 
+# -------------------------------------------------------------
+# MÓDULO 3: FRENTE DE CAIXA 
+# -------------------------------------------------------------
 elif menu_selecionado == "🛒 Frente de Caixa":
     st.title("Frente de Caixa (PDV)")
     df_produtos = puxar_dados('Produtos')
@@ -521,6 +511,9 @@ elif menu_selecionado == "🛒 Frente de Caixa":
                     st.session_state.transacao_id = int(time.time())
                     st.rerun()
 
+# -------------------------------------------------------------
+# MÓDULO 4: DESPESAS
+# -------------------------------------------------------------
 elif menu_selecionado == "💸 Despesas":
     st.title("💸 Gestão de Despesas")
     categorias_despesas = ["👨‍🍳 Folha de Pagamento", "📦 Embalagens & Logística", "💡 Custos Fixos & Estrutura", "📣 Marketing & Software", "🚨 Imprevistos & Manutenção", "🛒 Supermercado (Uso Geral)", "Outros"]
@@ -559,6 +552,9 @@ elif menu_selecionado == "💸 Despesas":
             else: c5.write("-")
             st.markdown("<hr style='margin:0px; padding:0px; border-color:#F0F0F0'>", unsafe_allow_html=True)
 
+# -------------------------------------------------------------
+# MÓDULO 5: PRODUTOS
+# -------------------------------------------------------------
 elif menu_selecionado == "🍔 Produtos":
     st.title("Gestão do Cardápio")
     categorias_opcoes = ["HAMBÚRGUER", "SANDUBA", "ACOMPANHAMENTO", "BEBIDAS", "CHURRASCO", "COMBOS", "SOBREMESA", "OUTROS"]
@@ -626,6 +622,9 @@ elif menu_selecionado == "🍔 Produtos":
                     puxar_dados.clear() 
                     st.success("✅ Atualizado!")
 
+# -------------------------------------------------------------
+# MÓDULO 6: INSUMOS
+# -------------------------------------------------------------
 elif menu_selecionado == "🍅 Insumos":
     st.title("Gestão de Insumos")
     with st.form("form_insumos", clear_on_submit=True):
@@ -673,3 +672,106 @@ elif menu_selecionado == "🍅 Insumos":
                             except: pass 
                     puxar_dados.clear() 
                     st.success("✅ Insumo e Cardápio recalculados!")
+
+# -------------------------------------------------------------
+# MÓDULO 7: LISTA DE COMPRAS E ESTOQUE
+# -------------------------------------------------------------
+elif menu_selecionado == "📝 Lista de Compras":
+    st.title("📝 Lista de Compras e Estoque")
+    
+    col_l1, col_l2 = st.columns([1, 2])
+    
+    with col_l1:
+        st.markdown("#### ➕ Adicionar à Lista")
+        with st.form("form_lista_compras", clear_on_submit=True):
+            compra_nome = st.text_input("Nome do Produto (Ex: Maionese Heinz)")
+            compra_fornecedor = st.text_input("Fornecedor / Mercado (Opcional)")
+            
+            c_col1, c_col2 = st.columns(2)
+            with c_col1:
+                compra_valor = st.number_input("Valor Estimado (R$)", min_value=0.0, step=0.01)
+            with c_col2:
+                compra_unidade = st.selectbox("Vendido por", ["Unidade", "Caixa", "Kg", "Pacote", "Fardo"])
+                
+            compra_qtd = st.number_input("Quantidade em Estoque", min_value=0.0, step=0.5, value=0.0)
+            
+            if st.form_submit_button("Salvar na Lista"):
+                if compra_nome:
+                    supabase.table("ListaCompras").insert({
+                        "Produto": compra_nome, 
+                        "Fornecedor": compra_fornecedor, 
+                        "Valor": compra_valor, 
+                        "Quantidade": compra_qtd, 
+                        "Unidade": compra_unidade
+                    }).execute()
+                    puxar_dados.clear()
+                    st.success(f"✅ {compra_nome} adicionado à lista!")
+                    time.sleep(1)
+                    st.rerun()
+                else:
+                    st.error("O nome do produto é obrigatório!")
+
+        st.divider()
+        st.markdown("#### ✏️ Editar Produto")
+        df_compras_edit = puxar_dados('ListaCompras')
+        
+        if not df_compras_edit.empty:
+            item_selecionado = st.selectbox("Selecione o produto para editar:", ["-- Escolha --"] + df_compras_edit['Produto'].tolist())
+            
+            if item_selecionado != "-- Escolha --":
+                dados_item = df_compras_edit[df_compras_edit['Produto'] == item_selecionado].iloc[0]
+                
+                with st.form("form_edit_compras"):
+                    edit_nome_comp = st.text_input("Nome do Produto", value=str(dados_item['Produto']))
+                    edit_forn_comp = st.text_input("Fornecedor", value=str(dados_item.get('Fornecedor', '')))
+                    
+                    e_col1, e_col2 = st.columns(2)
+                    with e_col1:
+                        edit_val_comp = st.number_input("Valor Estimado (R$)", value=float(dados_item.get('Valor', 0)), step=0.01)
+                    with e_col2:
+                        opcoes_unid = ["Unidade", "Caixa", "Kg", "Pacote", "Fardo"]
+                        idx_unid = opcoes_unid.index(dados_item.get('Unidade', 'Unidade')) if dados_item.get('Unidade', 'Unidade') in opcoes_unid else 0
+                        edit_unid_comp = st.selectbox("Vendido por", opcoes_unid, index=idx_unid)
+                        
+                    edit_qtd_comp = st.number_input("Quantidade em Estoque", value=float(dados_item.get('Quantidade', 0)), step=0.5)
+                    
+                    if st.form_submit_button("Atualizar Produto"):
+                        supabase.table("ListaCompras").update({
+                            "Produto": edit_nome_comp,
+                            "Fornecedor": edit_forn_comp,
+                            "Valor": edit_val_comp,
+                            "Quantidade": edit_qtd_comp,
+                            "Unidade": edit_unid_comp
+                        }).eq("id", int(dados_item['id'])).execute()
+                        
+                        puxar_dados.clear()
+                        st.success("✅ Produto atualizado!")
+                        time.sleep(1)
+                        st.rerun()
+
+    with col_l2:
+        st.markdown("#### 🛒 Situação do Estoque")
+        df_compras_view = puxar_dados('ListaCompras')
+        
+        if not df_compras_view.empty:
+            # Multiplica quantidade pelo valor para dar uma previsão de gastos
+            custo_estimado = (df_compras_view['Quantidade'] * df_compras_view['Valor']).sum()
+            st.info(f"💰 **Valor Estimado em Estoque / Lista:** R$ {custo_estimado:,.2f}")
+            
+            # Função para pintar as linhas baseado na Quantidade
+            def colorir_estoque(valor):
+                try:
+                    v = float(valor)
+                    if v > 5: return 'background-color: #d4edda; color: #155724; font-weight: bold;' # Verde
+                    elif v >= 2: return 'background-color: #fff3cd; color: #856404; font-weight: bold;' # Amarelo
+                    else: return 'background-color: #f8d7da; color: #721c24; font-weight: bold;' # Vermelho
+                except:
+                    return ''
+
+            df_estilizado = df_compras_view.drop(columns=['id']).style.map(colorir_estoque, subset=['Quantidade'])
+            st.dataframe(df_estilizado, use_container_width=True)
+            
+            st.markdown("<br>", unsafe_allow_html=True)
+            st.caption("🟢 Acima de 5 | 🟡 Entre 2 e 5 | 🔴 Abaixo de 2")
+        else:
+            st.info("Sua lista de compras está vazia! Adicione o primeiro item.")
