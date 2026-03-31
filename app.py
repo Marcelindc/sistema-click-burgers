@@ -131,17 +131,25 @@ if menu_selecionado == "📊 Dashboard":
     else:
         df_vendas['Data'] = pd.to_datetime(df_vendas['Data'], format='%d/%m/%Y')
         if not df_despesas.empty: df_despesas['Data'] = pd.to_datetime(df_despesas['Data'], format='%d/%m/%Y')
+        
         df_produtos_atual = puxar_dados('Produtos')
-        dict_precos = {r['Nome do Produto']: float(r.get('Valor de Venda', 0)) - float(r.get('Desconto', 0) if r.get('Desconto', 0) != '' and pd.notna(r.get('Desconto')) else 0.0) for _, r in df_produtos_atual.iterrows()}
+        dict_precos = {}
+        for _, r in df_produtos_atual.iterrows():
+            p_padrao = float(r.get('Valor de Venda', 0))
+            d_prod = float(r.get('Desconto', 0) if r.get('Desconto', 0) != '' and pd.notna(r.get('Desconto')) else 0.0)
+            dict_precos[r['Nome do Produto']] = p_padrao - d_prod
 
         with st.container():
             st.markdown("#### Filtros de Análise")
             col_f1, col_f2, col_f3 = st.columns(3)
-            with col_f1: data_inicio = st.date_input("Data Inicial", df_vendas['Data'].min().date())
-            with col_f2: data_fim = st.date_input("Data Final", datetime.date.today())
+            primeira_data = df_vendas['Data'].min().date()
+            data_hoje = datetime.date.today()
+            with col_f1: data_inicio = st.date_input("Data Inicial", primeira_data)
+            with col_f2: data_fim = st.date_input("Data Final", data_hoje)
             with col_f3: produtos_filtrados = st.multiselect("Filtrar por Lanches:", list(dict_precos.keys()), placeholder="Todos")
         
-        df_filtrado = df_vendas[(df_vendas['Data'] >= pd.to_datetime(data_inicio)) & (df_vendas['Data'] <= pd.to_datetime(data_fim))]
+        mascara_vendas = (df_vendas['Data'] >= pd.to_datetime(data_inicio)) & (df_vendas['Data'] <= pd.to_datetime(data_fim))
+        df_filtrado = df_vendas.loc[mascara_vendas]
         
         total_despesas_periodo = 0.0
         if not df_despesas.empty:
@@ -149,12 +157,17 @@ if menu_selecionado == "📊 Dashboard":
             try: total_despesas_periodo = df_despesas.loc[mascara_desp]['Valor'].apply(lambda x: float(str(x).replace(',', '.'))).sum()
             except: total_despesas_periodo = df_despesas.loc[mascara_desp]['Valor'].sum()
         
-        if not df_filtrado.empty:
+        if df_filtrado.empty: st.warning("Nenhum dado encontrado para os filtros selecionados.")
+        else:
             dados_itens = []
             for idx, row in df_filtrado.iterrows():
-                subtotal_pedido = float(str(row.get('Subtotal', 0)).replace(',', '.'))
-                taxas_pedido = float(str(row.get('Taxas Cartão', 0)).replace(',', '.'))
-                lucro_pedido = float(str(row.get('Lucro Real', 0)).replace(',', '.'))
+                try: subtotal_pedido = float(str(row.get('Subtotal', 0)).replace(',', '.'))
+                except: subtotal_pedido = 0.0
+                try: taxas_pedido = float(str(row.get('Taxas Cartão', 0)).replace(',', '.'))
+                except: taxas_pedido = 0.0
+                try: lucro_pedido = float(str(row.get('Lucro Real', 0)).replace(',', '.'))
+                except: lucro_pedido = 0.0
+                
                 cliente_nome = str(row.get('Cliente', 'Avulso'))
                 for lanche in str(row['Itens']).split(', '):
                     match = re.match(r'(\d+)x\s+(.+)', lanche)
@@ -164,29 +177,122 @@ if menu_selecionado == "📊 Dashboard":
                         peso = (receita_item / subtotal_pedido) if subtotal_pedido > 0 else 0
                         dados_itens.append({'Lanche': nome, 'Quantidade': qtd, 'Receita': receita_item, 'Lucro Proporcional': lucro_pedido * peso, 'Taxa Proporcional': taxas_pedido * peso, 'Cliente': cliente_nome})
             
+            df_itens = pd.DataFrame(dados_itens)
             if produtos_filtrados:
-                df_itens_filtrado = pd.DataFrame(dados_itens)[pd.DataFrame(dados_itens)['Lanche'].isin(produtos_filtrados)]
-                vendas_totais_kpi, lucro_kpi, taxas_kpi = df_itens_filtrado['Receita'].sum(), df_itens_filtrado['Lucro Proporcional'].sum(), df_itens_filtrado['Taxa Proporcional'].sum()
+                df_itens_filtrado = df_itens[df_itens['Lanche'].isin(produtos_filtrados)]
+                vendas_totais_kpi = df_itens_filtrado['Receita'].sum()
+                lucro_kpi = df_itens_filtrado['Lucro Proporcional'].sum()
+                taxas_kpi = df_itens_filtrado['Taxa Proporcional'].sum()
+                despesas_mostrar = 0.0 
+                qtd_unidades_kpi = df_itens_filtrado['Quantidade'].sum()
+                ticket_kpi = vendas_totais_kpi / qtd_unidades_kpi if qtd_unidades_kpi > 0 else 0
                 margem_kpi = (lucro_kpi / vendas_totais_kpi * 100) if vendas_totais_kpi > 0 else 0
+                cmv_valor = vendas_totais_kpi - lucro_kpi 
+                cmv_perc = (cmv_valor / vendas_totais_kpi * 100) if vendas_totais_kpi > 0 else 0
+                descontos_kpi = 0.0
+                tit_k1, tit_k2, tit_k3, tit_k4 = "Receita (Filtro)", "Margem Bruta", "Despesas (N/A)", "Taxas (Filtro)"
+                tit_k5, tit_k6, tit_k7, tit_k8 = "Preço Médio (Unid.)", "Margem (%)", "CMV (Insumos %)", "Descontos (N/A)"
             else:
                 vendas_totais_kpi = df_filtrado['Total Pago'].sum()
                 taxas_kpi = df_filtrado['Taxas Cartão'].sum()
+                despesas_mostrar = total_despesas_periodo
                 lucro_kpi = df_filtrado['Lucro Real'].sum() - total_despesas_periodo
+                qtd_pedidos = len(df_filtrado)
+                ticket_kpi = vendas_totais_kpi / qtd_pedidos if qtd_pedidos > 0 else 0
                 margem_kpi = (lucro_kpi / vendas_totais_kpi * 100) if vendas_totais_kpi > 0 else 0
-
-            k1, k2, k3, k4 = st.columns(4)
-            k1.markdown(f"""<div class="click-kpi-card card-faturamento"><div class="click-kpi-title">Faturamento</div><div class="click-kpi-value">R$ {vendas_totais_kpi:,.2f}</div></div>""", unsafe_allow_html=True)
-            k2.markdown(f"""<div class="click-kpi-card card-lucro"><div class="click-kpi-title">Lucro Líquido</div><div class="click-kpi-value">R$ {lucro_kpi:,.2f}</div></div>""", unsafe_allow_html=True)
-            k3.markdown(f"""<div class="click-kpi-card card-despesas"><div class="click-kpi-title">Despesas</div><div class="click-kpi-value">- R$ {total_despesas_periodo:,.2f}</div></div>""", unsafe_allow_html=True)
-            k4.markdown(f"""<div class="click-kpi-card card-taxas"><div class="click-kpi-title">Margem</div><div class="click-kpi-value">{margem_kpi:,.1f}%</div></div>""", unsafe_allow_html=True)
+                lucro_bruto = df_filtrado['Lucro Real'].sum()
+                cmv_valor = (df_filtrado['Total Pago'].sum() - df_filtrado['Taxas Cartão'].sum()) - lucro_bruto
+                cmv_perc = (cmv_valor / vendas_totais_kpi * 100) if vendas_totais_kpi > 0 else 0
+                try: descontos_kpi = df_filtrado['Desconto'].sum()
+                except: descontos_kpi = 0.0
+                tit_k1, tit_k2, tit_k3, tit_k4 = "Faturamento Bruto", "Lucro Líquido Real", "Despesas Operacionais", "Taxas Pagas"
+                tit_k5, tit_k6, tit_k7, tit_k8 = "Ticket Médio", "Margem Líquida (%)", "CMV (Custo Comida)", "Descontos Concedidos"
             
-            st.markdown("#### Evolução de Faturamento por Dia")
-            df_linha = df_filtrado.groupby('Data')['Total Pago'].sum().reset_index()
-            df_linha['Data_Formatada'] = df_linha['Data'].dt.strftime('%d/%m/%Y')
-            fig_linha = px.line(df_linha, x='Data_Formatada', y='Total Pago', markers=True)
-            fig_linha.update_traces(line=dict(color='#E31837', width=3), marker=dict(size=8, color='#E31837', line=dict(width=2, color='white')), fill='tozeroy', fillcolor='rgba(227, 24, 55, 0.1)') 
-            fig_linha.update_layout(plot_bgcolor='#FFFFFF', paper_bgcolor='#FFFFFF', xaxis_title="", yaxis_title="R$", height=320, margin=dict(l=0, r=0, t=20, b=0), xaxis=dict(showgrid=False, type='category'), yaxis=dict(showgrid=True, gridcolor='#F0F0F0'))
-            st.plotly_chart(fig_linha, use_container_width=True)
+            st.markdown(f"<span style='color:#6C757D; font-size:14px'><b>Total de Pedidos no período:</b> {len(df_filtrado)}</span>", unsafe_allow_html=True)
+            
+            k1, k2, k3, k4 = st.columns(4)
+            k1.markdown(f"""<div class="click-kpi-card card-faturamento"><div class="click-kpi-title">{tit_k1}</div><div class="click-kpi-value">R$ {vendas_totais_kpi:,.2f}</div></div>""", unsafe_allow_html=True)
+            k2.markdown(f"""<div class="click-kpi-card card-lucro"><div class="click-kpi-title">{tit_k2}</div><div class="click-kpi-value">R$ {lucro_kpi:,.2f}</div></div>""", unsafe_allow_html=True)
+            k3.markdown(f"""<div class="click-kpi-card card-despesas"><div class="click-kpi-title">{tit_k3}</div><div class="click-kpi-value">- R$ {despesas_mostrar:,.2f}</div></div>""", unsafe_allow_html=True)
+            k4.markdown(f"""<div class="click-kpi-card card-taxas"><div class="click-kpi-title">{tit_k4}</div><div class="click-kpi-value">- R$ {taxas_kpi:,.2f}</div></div>""", unsafe_allow_html=True)
+            
+            k5, k6, k7, k8 = st.columns(4)
+            k5.markdown(f"""<div class="click-kpi-card card-ticket"><div class="click-kpi-title">{tit_k5}</div><div class="click-kpi-value">R$ {ticket_kpi:,.2f}</div></div>""", unsafe_allow_html=True)
+            k6.markdown(f"""<div class="click-kpi-card card-margem"><div class="click-kpi-title">{tit_k6}</div><div class="click-kpi-value">{margem_kpi:,.1f}%</div></div>""", unsafe_allow_html=True)
+            k7.markdown(f"""<div class="click-kpi-card card-cmv"><div class="click-kpi-title">{tit_k7}</div><div class="click-kpi-value">R$ {cmv_valor:,.2f} <span style="font-size:16px; font-weight:normal">({cmv_perc:.1f}%)</span></div></div>""", unsafe_allow_html=True)
+            k8.markdown(f"""<div class="click-kpi-card card-desc"><div class="click-kpi-title">{tit_k8}</div><div class="click-kpi-value">- R$ {descontos_kpi:,.2f}</div></div>""", unsafe_allow_html=True)
+
+            st.markdown("<br>", unsafe_allow_html=True)
+            g_col0, g_col1, g_col2 = st.columns([1, 1, 1])
+            with g_col0:
+                st.markdown("#### 🏆 Top 5 Clientes VIP")
+                if 'Cliente' in df_filtrado.columns:
+                    if produtos_filtrados:
+                        df_base_vips = df_itens_filtrado
+                        coluna_valor = 'Receita'
+                    else:
+                        df_base_vips = df_filtrado
+                        coluna_valor = 'Subtotal'
+                    df_vendas_clientes = df_base_vips[(df_base_vips['Cliente'] != 'Avulso') & (df_base_vips['Cliente'].notna()) & (df_base_vips['Cliente'] != '')]
+                    if not df_vendas_clientes.empty:
+                        top_clientes = df_vendas_clientes.groupby('Cliente')[coluna_valor].sum().reset_index().sort_values(coluna_valor, ascending=False).head(5)
+                        fig_vips = px.bar(top_clientes, x=coluna_valor, y='Cliente', orientation='h', text=coluna_valor, color_discrete_sequence=['#FFC107']) 
+                        fig_vips.update_traces(textposition='outside', texttemplate='R$ %{x:.2f}', hovertemplate='Cliente: %{y}<br>Gasto: R$ %{x:.2f}')
+                        fig_vips.update_layout(bargap=0.4, plot_bgcolor='#FFFFFF', paper_bgcolor='#FFFFFF', height=320, margin=dict(l=0, r=0, t=20, b=0), xaxis=dict(showgrid=False), yaxis=dict(showgrid=False), yaxis_categoryorder='total ascending')
+                        st.plotly_chart(fig_vips, use_container_width=True)
+                    else: st.info("Nenhuma venda VIP registrada nestes filtros.")
+                else: st.info("O campo de Clientes ainda não possui dados de vendas.")
+                    
+            with g_col1:
+                st.markdown("#### Evolução de Faturamento por Dia")
+                df_linha = df_filtrado.groupby('Data')['Total Pago'].sum().reset_index()
+                df_linha['Data_Formatada'] = df_linha['Data'].dt.strftime('%d/%m/%Y')
+                fig_linha = px.line(df_linha, x='Data_Formatada', y='Total Pago', markers=True)
+                fig_linha.update_traces(line=dict(color='#E31837', width=3), marker=dict(size=8, color='#E31837', line=dict(width=2, color='white')), fill='tozeroy', fillcolor='rgba(227, 24, 55, 0.1)', hovertemplate='Data: %{x}<br>Total: R$ %{y:.2f}') 
+                fig_linha.update_layout(plot_bgcolor='#FFFFFF', paper_bgcolor='#FFFFFF', xaxis_title="", yaxis_title="R$", height=320, margin=dict(l=0, r=0, t=20, b=0), xaxis=dict(showgrid=False, type='category'), yaxis=dict(showgrid=True, gridcolor='#F0F0F0'))
+                st.plotly_chart(fig_linha, use_container_width=True)
+
+            with g_col2:
+                st.markdown("#### Divisão de Pagamentos")
+                if produtos_filtrados:
+                    dados_itens_pag = []
+                    for idx, row in df_filtrado.iterrows():
+                        try: subtotal_pedido = float(str(row.get('Subtotal', 0)).replace(',', '.'))
+                        except: subtotal_pedido = 0.0
+                        try: val_pix = float(str(row.get('Pix', 0)).replace(',', '.'))
+                        except: val_pix = 0.0
+                        try: val_din = float(str(row.get('Dinheiro', 0)).replace(',', '.'))
+                        except: val_din = 0.0
+                        try: val_deb = float(str(row.get('Débito', 0)).replace(',', '.'))
+                        except: val_deb = 0.0
+                        try: val_cred = float(str(row.get('Crédito', 0)).replace(',', '.'))
+                        except: val_cred = 0.0
+                        for lanche in str(row['Itens']).split(', '):
+                            match = re.match(r'(\d+)x\s+(.+)', lanche)
+                            if match:
+                                qtd = int(match.group(1))
+                                nome = match.group(2)
+                                if nome in produtos_filtrados:
+                                    preco_atual = dict_precos.get(nome, 0)
+                                    receita_item = qtd * preco_atual
+                                    peso = (receita_item / subtotal_pedido) if subtotal_pedido > 0 else 0
+                                    dados_itens_pag.append({'Pix Prop': val_pix * peso, 'Dinheiro Prop': val_din * peso, 'Débito Prop': val_deb * peso, 'Crédito Prop': val_cred * peso})
+                    if dados_itens_pag:
+                        df_itens_pag = pd.DataFrame(dados_itens_pag)
+                        soma_pix, soma_din = round(df_itens_pag['Pix Prop'].sum(), 2), round(df_itens_pag['Dinheiro Prop'].sum(), 2)
+                        soma_deb, soma_cred = round(df_itens_pag['Débito Prop'].sum(), 2), round(df_itens_pag['Crédito Prop'].sum(), 2)
+                    else: soma_pix = soma_din = soma_deb = soma_cred = 0.0
+                else:
+                    soma_pix, soma_din = round(df_filtrado['Pix'].sum(), 2), round(df_filtrado['Dinheiro'].sum(), 2)
+                    soma_deb, soma_cred = round(df_filtrado['Débito'].sum(), 2), round(df_filtrado['Crédito'].sum(), 2)
+                df_pagamentos = pd.DataFrame({'Modalidade': ['PIX', 'Dinheiro', 'Débito', 'Crédito'], 'Valor (R$)': [soma_pix, soma_din, soma_deb, soma_cred]})
+                df_pagamentos = df_pagamentos[df_pagamentos['Valor (R$)'] > 0]
+                if not df_pagamentos.empty:
+                    fig_rosca = px.pie(df_pagamentos, values='Valor (R$)', names='Modalidade', hole=0.6, color_discrete_sequence=['#1E1E1E', '#FFC107', '#9E9E9E', '#E31837'])
+                    fig_rosca.update_traces(textposition='inside', textinfo='percent+label', hovertemplate='Modalidade: %{label}<br>Valor: R$ %{value:.2f}', marker=dict(line=dict(color='#FFFFFF', width=2)))
+                    fig_rosca.update_layout(plot_bgcolor='#FFFFFF', paper_bgcolor='#FFFFFF', height=320, margin=dict(l=0, r=0, t=20, b=0), showlegend=False)
+                    st.plotly_chart(fig_rosca, use_container_width=True)
+                else: st.info("Sem pagamentos registrados.")
 
 # -------------------------------------------------------------
 # MÓDULO 2: FRENTE DE CAIXA 
